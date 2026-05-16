@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Fusion Admin — App Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="admin.css"/>
+</head>
+<body>
+
+<!-- ══ LOCK SCREEN ═══════════════════════════════════════════ -->
+<div class="lockscreen" id="lockscreen">
+  <div class="lock-card">
+    <div class="lock-icon"><i class="fas fa-lock"></i></div>
+    <h1>Fusion Admin</h1>
+    <p>Enter your admin password to continue.</p>
+    <form id="loginForm" novalidate>
+      <div class="fg">
+        <label>Password</label>
+        <div class="pw-wrap">
+          <input type="password" id="loginPw" placeholder="Admin password" autocomplete="current-password" required/>
+          <button type="button" class="pw-toggle" id="pwToggle"><i class="fas fa-eye"></i></button>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary full" id="loginBtn">
+        <span>Unlock</span><i class="fas fa-arrow-right"></i>
+      </button>
+      <p class="login-note" id="loginNote"></p>
+    </form>
+    <a href="../index.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Portfolio</a>
+  </div>
+</div>
+
+<!-- ══ ADMIN PANEL ═══════════════════════════════════════════ -->
+<div class="admin-wrap" id="adminWrap" style="display:none">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-top">
+      <div class="sb-logo"><span class="logo-mark">F</span><span>Admin</span></div>
+      <button class="sb-toggle" id="sbToggle"><i class="fas fa-bars"></i></button>
+    </div>
+    <nav class="sb-nav">
+      <button class="sb-item active" data-tab="apps"><i class="fas fa-th-large"></i><span>Apps</span></button>
+      <button class="sb-item" data-tab="add"><i class="fas fa-plus-circle"></i><span>Add App</span></button>
+      <button class="sb-item" data-tab="upload"><i class="fas fa-upload"></i><span>Upload Files</span></button>
+    </nav>
+    <div class="sb-bot">
+      <div class="sb-status" id="sbStatus"><span class="sdot"></span><span>Connected</span></div>
+      <button class="sb-item logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i><span>Logout</span></button>
+      <a href="../index.html" class="sb-item"><i class="fas fa-external-link-alt"></i><span>View Site</span></a>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="admin-main" id="adminMain">
+
+    <!-- Top bar -->
+    <div class="topbar">
+      <button class="topbar-sb-toggle" id="topbarSbToggle"><i class="fas fa-bars"></i></button>
+      <div class="topbar-title" id="topbarTitle">Apps</div>
+      <div class="topbar-actions" id="topbarActions"></div>
+    </div>
+
+    <!-- Toast container -->
+    <div class="toasts" id="toasts"></div>
+
+    <!-- ── TAB: APPS ── -->
+    <div class="tab-panel active" id="tab-apps">
+      <div class="panel-head">
+        <div class="panel-search">
+          <i class="fas fa-search"></i>
+          <input type="text" id="appSearch" placeholder="Search apps…"/>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="switchTab('add')">
+          <i class="fas fa-plus"></i> Add App
+        </button>
+      </div>
+      <div class="admin-apps-grid" id="adminAppsGrid">
+        <div class="loading-state"><i class="fas fa-spinner fa-spin"></i> Loading apps…</div>
+      </div>
+    </div>
+
+    <!-- ── TAB: ADD / EDIT APP ── -->
+    <div class="tab-panel" id="tab-add">
+      <div class="form-card">
+        <div class="form-card-head">
+          <h2 id="formTitle">Add New App</h2>
+          <button class="btn btn-ghost btn-sm" id="cancelEdit" style="display:none" onclick="cancelEdit()">
+            <i class="fas fa-times"></i> Cancel
+          </button>
+        </div>
+
+        <form id="appForm" novalidate>
+          <input type="hidden" id="editingId"/>
+
+          <div class="form-grid">
+            <!-- Basic Info -->
+            <div class="form-section">
+              <h3 class="fsec-title"><i class="fas fa-info-circle"></i> Basic Info</h3>
+
+              <div class="fg required"><label>App Name</label>
+                <input type="text" id="f_name" placeholder="e.g. NoteFlow" required/></div>
+
+              <div class="fg required"><label>Short Description</label>
+                <input type="text" id="f_short" placeholder="One-line summary (shown on cards)" required/></div>
+
+              <div class="fg required"><label>Full Description</label>
+                <textarea id="f_full" rows="4" placeholder="Detailed description shown in the app modal" required></textarea></div>
+
+              <div class="fg-row">
+                <div class="fg required"><label>Category</label>
+                  <select id="f_cat">
+                    <option value="">Select…</option>
+                    <option>Productivity</option><option>Design Tools</option>
+                    <option>Finance</option><option>Utilities</option>
+                    <option>Education</option><option>Entertainment</option>
+                    <option>Social</option><option>Health</option>
+                    <option>Games</option><option>Other</option>
+                  </select></div>
+                <div class="fg required"><label>Status</label>
+                  <select id="f_status">
+                    <option value="live">Live</option>
+                    <option value="beta">Beta</option>
+                    <option value="wip">In Progress</option>
+                    <option value="planned">Planned</option>
+                  </select></div>
+              </div>
+
+              <div class="fg-row">
+                <div class="fg"><label>Version</label>
+                  <input type="text" id="f_version" placeholder="1.0.0"/></div>
+                <div class="fg"><label>Release Date</label>
+                  <input type="date" id="f_date"/></div>
+              </div>
+
+              <div class="fg"><label>Platform <small>(comma-separated)</small></label>
+                <input type="text" id="f_platform" placeholder="Web, Android, iOS"/></div>
+
+              <div class="fg"><label>Tech Stack <small>(comma-separated)</small></label>
+                <input type="text" id="f_tech" placeholder="React, Firebase, Tailwind"/></div>
+
+              <div class="fg toggle-fg">
+                <label>Featured App</label>
+                <label class="toggle">
+                  <input type="checkbox" id="f_featured"/>
+                  <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Links -->
+            <div class="form-section">
+              <h3 class="fsec-title"><i class="fas fa-link"></i> Links</h3>
+
+              <div class="fg"><label>Logo URL</label>
+                <input type="url" id="f_logo" placeholder="https://… or use Upload tab"/></div>
+
+              <div class="fg"><label>Live Demo URL</label>
+                <input type="url" id="f_demo" placeholder="https://your-app.github.io"/></div>
+
+              <div class="fg"><label>GitHub URL</label>
+                <input type="url" id="f_github" placeholder="https://github.com/…"/></div>
+
+              <div class="fg"><label>Download URL</label>
+                <input type="url" id="f_download" placeholder="https://drive.google.com/… or APK link"/></div>
+
+              <div class="fg"><label>File Size</label>
+                <input type="text" id="f_size" placeholder="e.g. 4.2 MB"/></div>
+
+              <div class="fg"><label>Video URL <small>(YouTube or .mp4)</small></label>
+                <input type="url" id="f_video" placeholder="https://youtube.com/watch?v=…"/></div>
+
+              <div class="fg"><label>Screenshot URLs <small>(one per line)</small></label>
+                <textarea id="f_screenshots" rows="4" placeholder="https://drive.google.com/…&#10;https://drive.google.com/…"></textarea></div>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="submitAppBtn">
+              <i class="fas fa-save"></i> <span id="submitLabel">Save App</span>
+            </button>
+            <button type="button" class="btn btn-ghost" onclick="resetAppForm()">
+              <i class="fas fa-undo"></i> Reset
+            </button>
+          </div>
+
+          <div class="form-msg" id="formMsg"></div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── TAB: UPLOAD FILES ── -->
+    <div class="tab-panel" id="tab-upload">
+      <div class="form-card">
+        <div class="form-card-head"><h2>Upload Files to Google Drive</h2></div>
+        <p class="upload-info">
+          Files are uploaded to your Google Drive folder via Apps Script and made publicly viewable.
+          Copy the returned URL into the app form above.
+        </p>
+
+        <div class="upload-sections">
+          <!-- Logo -->
+          <div class="upload-block">
+            <h3 class="fsec-title"><i class="fas fa-image"></i> Logo</h3>
+            <div class="drop-zone" id="dz-logo" data-type="logo" data-accept="image/*">
+              <i class="fas fa-cloud-upload-alt"></i>
+              <span>Drag & drop or click to choose logo</span>
+              <small>PNG, JPG, WebP — recommended 512×512</small>
+              <input type="file" accept="image/*" class="dz-input"/>
+            </div>
+            <div class="upload-preview" id="prev-logo"></div>
+            <button class="btn btn-primary btn-sm" onclick="uploadFile('logo')"><i class="fas fa-upload"></i> Upload Logo</button>
+            <div class="upload-result" id="res-logo"></div>
+          </div>
+
+          <!-- Screenshots -->
+          <div class="upload-block">
+            <h3 class="fsec-title"><i class="fas fa-images"></i> Screenshots</h3>
+            <div class="drop-zone" id="dz-ss" data-type="screenshot" data-accept="image/*">
+              <i class="fas fa-cloud-upload-alt"></i>
+              <span>Drag & drop or click to choose screenshots</span>
+              <small>PNG, JPG — multiple files allowed</small>
+              <input type="file" accept="image/*" multiple class="dz-input"/>
+            </div>
+            <div class="upload-preview" id="prev-ss"></div>
+            <button class="btn btn-primary btn-sm" onclick="uploadFile('screenshot')"><i class="fas fa-upload"></i> Upload Screenshots</button>
+            <div class="upload-result" id="res-ss"></div>
+          </div>
+
+          <!-- Video -->
+          <div class="upload-block">
+            <h3 class="fsec-title"><i class="fas fa-film"></i> Video Preview</h3>
+            <div class="drop-zone" id="dz-video" data-type="video" data-accept="video/*">
+              <i class="fas fa-cloud-upload-alt"></i>
+              <span>Drag & drop or click to choose video</span>
+              <small>MP4, WebM — max 50 MB</small>
+              <input type="file" accept="video/*" class="dz-input"/>
+            </div>
+            <div class="upload-preview" id="prev-video"></div>
+            <button class="btn btn-primary btn-sm" onclick="uploadFile('video')"><i class="fas fa-upload"></i> Upload Video</button>
+            <div class="upload-result" id="res-video"></div>
+          </div>
+
+          <!-- Download file -->
+          <div class="upload-block">
+            <h3 class="fsec-title"><i class="fas fa-file-archive"></i> APK / ZIP / Download</h3>
+            <div class="drop-zone" id="dz-dl" data-type="download" data-accept=".apk,.zip,.rar,.exe,.dmg">
+              <i class="fas fa-cloud-upload-alt"></i>
+              <span>Drag & drop or click to choose file</span>
+              <small>APK, ZIP, EXE, DMG, RAR</small>
+              <input type="file" accept=".apk,.zip,.rar,.exe,.dmg" class="dz-input"/>
+            </div>
+            <div class="upload-preview" id="prev-dl"></div>
+            <button class="btn btn-primary btn-sm" onclick="uploadFile('download')"><i class="fas fa-upload"></i> Upload File</button>
+            <div class="upload-result" id="res-dl"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ══ DELETE CONFIRM MODAL ══════════════════════════════════ -->
+<div class="modal-overlay" id="deleteOverlay">
+  <div class="confirm-modal">
+    <div class="confirm-icon"><i class="fas fa-trash-alt"></i></div>
+    <h3>Delete App</h3>
+    <p id="deleteMsg">Are you sure you want to delete this app? This cannot be undone.</p>
+    <div class="confirm-actions">
+      <button class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+      <button class="btn btn-ghost" onclick="closeDeleteModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="admin.js"></script>
+</body>
+</html>

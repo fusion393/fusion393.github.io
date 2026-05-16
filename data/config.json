@@ -1,0 +1,20 @@
+{
+  "site": {
+    "name": "Fusion",
+    "tagline": "Apps crafted with intention",
+    "author": "Md. Shamim Al Razi",
+    "url": "https://fusion393.github.io",
+    "description": "A curated collection of apps, tools, and experiments crafted with intention — each one solving a real problem, beautifully.",
+    "email": "contact@fusion393.github.io",
+    "github": "https://github.com/fusion393"
+  },
+  "backend": {
+    "appsScriptUrl": "https://script.google.com/macros/s/AKfycbyW_EqjcQvg8vZRHXvtd2X3SiaUPsK9XQcXk-g2stVlHE_KXqWZlLvxNk9zc4Jzod0Y4w/exec" 
+  },
+  "features": {
+    "contact": true,
+    "download": true,
+    "videoPreview": true,
+    "screenshots": true
+  }
+}
