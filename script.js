@@ -61,7 +61,20 @@ async function boot() {
 function applyConfig() {
   const s = CONFIG.site || {};
   if (s.description) $('#heroSub').textContent = s.description;
-  if (s.tagline)     $('#footerTagline').textContent = s.tagline + ' By ' + (s.author || '');
+
+  // Footer tagline with real author name
+  const taglineEl = $('#footerTagline');
+  if (taglineEl) {
+    taglineEl.textContent = (s.tagline || 'Apps crafted with intention.') +
+      (s.author ? ' · By ' + s.author : '');
+  }
+
+  // Footer copyright year + name
+  const copyrightEl = $('#footerCopyright');
+  if (copyrightEl) {
+    copyrightEl.textContent = '© ' + new Date().getFullYear() +
+      ' Fusion · ' + (s.author || 'Md. Shamim Al Razi');
+  }
 
   const fl = $('#footerLinks');
   if (fl) {
@@ -89,21 +102,46 @@ function channelHTML(icon, label, value, href) {
 
 /* ═══════════════════════════════════════
    DATA LOADING
+   
+   CORS note:
+   Apps Script GET requests work fine — the browser follows a redirect to
+   googleapis.com which has proper CORS headers.
+   
+   POST requests from a browser trigger a preflight (OPTIONS) that Apps Script
+   cannot answer. The workaround: send POST data as a GET param using a
+   'no-cors' redirect trick, or simply encode the action in the URL and use
+   GET for all read operations (already done). For writes (admin panel),
+   the POST happens from admin.js — same mechanism works because the
+   response type ends up being 'opaque' for truly no-cors requests, but
+   Apps Script's redirect makes it work with full access in practice.
+   
+   If you still see CORS errors on POST:
+   → Make sure deployment is "Who has access: Anyone" (not "Google account required")
+   → Re-deploy as a NEW version after every code change
 ═══════════════════════════════════════ */
 async function loadApps() {
   const url = CONFIG?.backend?.appsScriptUrl;
   if (url) {
     try {
-      const data = await fetchJSON(url + '?action=getApps');
+      // Apps Script GET requests go through a redirect; fetchJSON handles it
+      const data = await fetchJSON(url + '?action=getApps&_=' + Date.now());
       if (Array.isArray(data) && data.length > 0) {
         return { apps: data, source: 'live' };
       }
-    } catch(_) {}
+      // Backend reachable but no apps yet → still "live" source, just empty
+      if (Array.isArray(data)) {
+        return { apps: [], source: 'live' };
+      }
+    } catch(err) {
+      console.warn('Backend fetch failed, using fallback.', err.message);
+    }
   }
-  // Fallback
+
+  // Fallback JSON
   try {
     const data = await fetchJSON('./data/apps-fallback.json');
-    return { apps: Array.isArray(data) ? data : [], source: 'fallback' };
+    const apps = Array.isArray(data) ? data.filter(a => a.id && a.name) : [];
+    return { apps, source: 'fallback' };
   } catch(_) {
     return { apps: [], source: 'fallback' };
   }
@@ -121,11 +159,15 @@ function showDataBadge(source) {
   if (source === 'live') {
     b.textContent = '● Live data';
     b.classList.add('live-src');
+    b.classList.remove('fallback-src');
   } else {
     b.textContent = '● Cached data';
     b.classList.add('fallback-src');
+    b.classList.remove('live-src');
   }
-  $('#heroBadgeText').textContent = ALL_APPS.length + ' apps available';
+  $('#heroBadgeText').textContent = ALL_APPS.length
+    ? ALL_APPS.length + ' app' + (ALL_APPS.length !== 1 ? 's' : '') + ' available'
+    : 'Apps coming soon';
 }
 
 /* ═══════════════════════════════════════
@@ -157,6 +199,12 @@ function countUp(el, target, dur=1200) {
 function renderFeatured() {
   const wrap = $('#featuredWrap');
   if (!wrap) return;
+
+  if (!ALL_APPS.length) {
+    wrap.innerHTML = '';
+    return;
+  }
+
   const app = ALL_APPS.find(a => a.featured) || ALL_APPS[0];
   if (!app) { wrap.innerHTML = ''; return; }
 
@@ -174,12 +222,12 @@ function renderFeatured() {
       <div class="feat-badge"><i class="fas fa-star"></i> Featured App</div>
       <h2 class="feat-name">${app.name}</h2>
       <p class="feat-desc">${app.fullDescription || app.shortDescription}</p>
-      <div class="chips">${(app.tech||[]).map(t=>`<span class="chip">${t}</span>`).join('')}</div>
+      <div class="chips">${(arrVal(app.tech)).map(t=>`<span class="chip">${t}</span>`).join('')}</div>
       <div class="feat-meta">
         <div class="feat-meta-row"><i class="fas fa-tag"></i><span><strong>Category:</strong> ${app.category}</span></div>
         <div class="feat-meta-row"><i class="fas fa-circle-dot"></i><span><strong>Status:</strong> ${STATUS_LABEL[app.status]||app.status}</span></div>
         ${app.version?`<div class="feat-meta-row"><i class="fas fa-code-branch"></i><span><strong>Version:</strong> ${app.version}</span></div>`:''}
-        ${app.platform?.length?`<div class="feat-meta-row"><i class="fas fa-desktop"></i><span><strong>Platform:</strong> ${arrVal(app.platform).join(', ')}</span></div>`:''}
+        ${arrVal(app.platform).length?`<div class="feat-meta-row"><i class="fas fa-desktop"></i><span><strong>Platform:</strong> ${arrVal(app.platform).join(', ')}</span></div>`:''}
       </div>
       <div class="feat-actions">
         ${app.liveDemo?`<a href="${app.liveDemo}" target="_blank" rel="noopener" class="btn btn-primary btn-sm"><i class="fas fa-external-link-alt"></i> Live Demo</a>`:''}
@@ -223,44 +271,46 @@ function buildFilters() {
 function renderGrid(apps) {
   const grid = $('#appsGrid');
   if (!grid) return;
+
   if (!apps.length) {
-    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--t3)"><i class="fas fa-box-open" style="font-size:2.5rem;display:block;margin-bottom:1rem"></i>No apps found.</div>`;
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;text-align:center;padding:4rem 1rem;opacity:.6">
+      <div style="font-size:3rem;margin-bottom:1rem">📦</div>
+      <p style="font-size:1.1rem">No apps yet — check back soon!</p>
+    </div>`;
     return;
   }
-  grid.innerHTML = apps.map((a,i) => cardHTML(a,i)).join('');
+
+  grid.innerHTML = apps.map(app => appCardHTML(app)).join('');
   initReveal();
 }
 
-function cardHTML(app, i=0) {
+function appCardHTML(app) {
   const logoEl = app.logoUrl
-    ? `<img src="${app.logoUrl}" alt="${app.name}" style="width:100%;height:100%;object-fit:cover;border-radius:14px" onerror="this.parentElement.innerHTML='${catEmoji(app.category)}';">`
-    : catEmoji(app.category);
+    ? `<img src="${app.logoUrl}" alt="${app.name}" onerror="this.parentElement.style.background='${iconColor(app.id)}';this.outerHTML='<span style=\\'font-size:2rem\\'>${catEmoji(app.category)}</span>'">`
+    : `<span style="font-size:2rem">${catEmoji(app.category)}</span>`;
 
   return `
-  <article class="app-card reveal" style="animation-delay:${i*50}ms" onclick="openModal('${app.id}')">
+  <div class="app-card reveal" data-id="${app.id}" onclick="openModal('${app.id}')">
     <div class="card-top">
       <div class="card-icon" style="background:${iconColor(app.id)}">${logoEl}</div>
       <div class="card-badges">
         <span class="sbadge ${app.status}">${STATUS_LABEL[app.status]||app.status}</span>
-        <span class="cbadge">${app.category}</span>
+        ${app.featured?'<span class="feat-pip" title="Featured"><i class="fas fa-star"></i></span>':''}
       </div>
     </div>
-    <div class="card-name">${app.name}</div>
-    <div class="card-desc">${app.shortDescription}</div>
-    <div class="chips">${arrVal(app.tech).slice(0,3).map(t=>`<span class="chip">${t}</span>`).join('')}</div>
-    ${app.version?`<div class="card-ver">v${app.version}</div>`:''}
-    <div class="card-actions" onclick="event.stopPropagation()">
-      ${app.liveDemo
-        ? `<a href="${app.liveDemo}" target="_blank" rel="noopener" class="btn btn-primary btn-sm"><i class="fas fa-external-link-alt"></i> Demo</a>`
-        : `<span class="btn btn-ghost btn-sm" style="opacity:.4;cursor:not-allowed;pointer-events:none"><i class="fas fa-clock"></i> Soon</span>`}
-      ${app.downloadUrl
-        ? `<a href="${app.downloadUrl}" target="_blank" rel="noopener" class="btn btn-outline btn-sm"><i class="fas fa-download"></i></a>`
-        : ''}
-      ${app.github
-        ? `<a href="${app.github}" target="_blank" rel="noopener" class="btn btn-outline btn-sm"><i class="fab fa-github"></i></a>`
-        : ''}
+    <div class="card-body">
+      <h3 class="card-name">${app.name}</h3>
+      <p class="card-sub">${app.shortDescription}</p>
     </div>
-  </article>`;
+    <div class="card-foot">
+      <span class="cbadge">${app.category}</span>
+      <div class="card-links" onclick="event.stopPropagation()">
+        ${app.liveDemo?`<a href="${app.liveDemo}" target="_blank" rel="noopener" title="Live Demo"><i class="fas fa-external-link-alt"></i></a>`:''}
+        ${app.github?`<a href="${app.github}" target="_blank" rel="noopener" title="GitHub"><i class="fab fa-github"></i></a>`:''}
+        ${app.downloadUrl?`<a href="${app.downloadUrl}" target="_blank" rel="noopener" title="Download"><i class="fas fa-download"></i></a>`:''}
+      </div>
+    </div>
+  </div>`;
 }
 
 /* ═══════════════════════════════════════
@@ -269,54 +319,62 @@ function cardHTML(app, i=0) {
 function renderCategories() {
   const grid = $('#catsGrid');
   if (!grid) return;
+
+  if (!ALL_APPS.length) { grid.innerHTML = ''; return; }
+
   const map = {};
-  ALL_APPS.forEach(a => { map[a.category] = (map[a.category]||0) + 1; });
-  grid.innerHTML = Object.entries(map).map(([name, count]) => `
-    <div class="cat-card reveal" onclick="filterByCategory('${name}')">
-      <span class="cat-ic">${CAT_ICONS[name]||'📦'}</span>
-      <div class="cat-nm">${name}</div>
-      <div class="cat-ct">${count} app${count>1?'s':''}</div>
-    </div>`).join('');
+  ALL_APPS.forEach(a => {
+    if (!map[a.category]) map[a.category] = 0;
+    map[a.category]++;
+  });
+
+  grid.innerHTML = Object.entries(map).map(([cat, count]) => `
+    <button class="cat-card reveal" onclick="filterByCategory('${cat}')">
+      <span class="cat-icon">${CAT_ICONS[cat]||'📦'}</span>
+      <span class="cat-name">${cat}</span>
+      <span class="cat-count">${count} app${count!==1?'s':''}</span>
+    </button>`).join('');
   initReveal();
 }
 
 function filterByCategory(cat) {
   document.querySelector('#apps').scrollIntoView({ behavior:'smooth', block:'start' });
-  setTimeout(() => {
-    $$('.fbtn').forEach(b => {
-      b.classList.toggle('active', b.dataset.filter === cat);
-    });
-    currentFilter = cat;
-    renderGrid(ALL_APPS.filter(a => a.category === cat));
-  }, 400);
+  setTimeout(() => window.scrollBy(0, -80), 50);
+  $$('.fbtn').forEach(b => b.classList.toggle('active', b.dataset.filter === cat));
+  currentFilter = cat;
+  renderGrid(ALL_APPS.filter(a => a.category === cat));
 }
+window.filterByCategory = filterByCategory;
 
 /* ═══════════════════════════════════════
-   MODAL
+   APP MODAL
 ═══════════════════════════════════════ */
 function openModal(id) {
-  const app = ALL_APPS.find(a => a.id == id);
+  const app = ALL_APPS.find(a => a.id === id);
   if (!app) return;
 
   const overlay = $('#modalOverlay');
   const body    = $('#modalBody');
 
   const logoEl = app.logoUrl
-    ? `<img src="${app.logoUrl}" alt="${app.name}" onerror="this.parentElement.innerHTML='${catEmoji(app.category)}';">`
-    : catEmoji(app.category);
+    ? `<img src="${app.logoUrl}" alt="${app.name}" class="mb-logo" onerror="this.style.display='none'">`
+    : `<div class="mb-logo-ph" style="background:${iconColor(app.id)}">${catEmoji(app.category)}</div>`;
 
   const videoHTML = buildVideoHTML(app.videoUrl);
-  const ssHTML    = (app.screenshotUrls||[]).length
-    ? `<div class="mb-section">
-         <h3><i class="fas fa-images"></i> Screenshots</h3>
-         <div class="mb-screenshots">${arrVal(app.screenshotUrls).map(u=>`<img src="${u}" alt="screenshot" onclick="openLightbox('${u}')">`).join('')}</div>
-       </div>` : '';
+
+  const ssHTML = (app.screenshotUrls||[]).length ? `
+    <div class="mb-section">
+      <h3><i class="fas fa-images"></i> Screenshots</h3>
+      <div class="mb-screenshots">
+        ${app.screenshotUrls.map(u=>`<img src="${u}" alt="screenshot" onclick="openLightbox('${u}')" loading="lazy">`).join('')}
+      </div>
+    </div>` : '';
 
   body.innerHTML = `
-    <div class="mb-hero">
-      <div class="mb-logo" style="background:${iconColor(app.id)}">${logoEl}</div>
-      <div class="mb-meta">
-        <h2 id="modalTitle">${app.name}</h2>
+    <div class="mb-header">
+      ${logoEl}
+      <div class="mb-head-info">
+        <h2 id="modalTitle" class="mb-title">${app.name}</h2>
         <div class="mb-badges">
           <span class="sbadge ${app.status}">${STATUS_LABEL[app.status]||app.status}</span>
           <span class="cbadge">${app.category}</span>
@@ -333,9 +391,9 @@ function openModal(id) {
     <div class="mb-section">
       <h3><i class="fas fa-info-circle"></i> Details</h3>
       <div class="mb-info-grid">
-        ${app.version    ? infoRow('Version',      app.version) : ''}
-        ${app.releaseDate? infoRow('Released',     app.releaseDate) : ''}
-        ${app.fileSize   ? infoRow('File Size',    app.fileSize) : ''}
+        ${app.version    ? infoRow('Version',   app.version)                        : ''}
+        ${app.releaseDate? infoRow('Released',  app.releaseDate)                    : ''}
+        ${app.fileSize   ? infoRow('File Size', app.fileSize)                       : ''}
         ${arrVal(app.platform).length ? infoRow('Platform', arrVal(app.platform).join(', ')) : ''}
       </div>
     </div>
@@ -381,15 +439,12 @@ function infoRow(label, value) {
 
 function buildVideoHTML(url) {
   if (!url) return '';
-  // YouTube
   const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
   if (yt) return `<iframe src="https://www.youtube.com/embed/${yt[1]}" allowfullscreen loading="lazy"></iframe>`;
-  // Direct video file
   if (/\.(mp4|webm|ogg)$/i.test(url)) return `<video src="${url}" controls preload="metadata"></video>`;
   return '';
 }
 
-/* ── Lightbox ───────────────────────────── */
 function openLightbox(src) {
   const lb = document.createElement('div');
   lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:3000;display:flex;align-items:center;justify-content:center;cursor:zoom-out;padding:2rem';
@@ -440,8 +495,7 @@ function initContactForm() {
         showNote(note, 'Network error. Please email directly.', 'err');
       }
     } else {
-      // No backend configured — simulate
-      await sleep(1000);
+      await sleep(800);
       showNote(note, '⚠ Backend not configured yet. Please email directly.', 'err');
     }
 
@@ -488,8 +542,7 @@ function initSmoothScroll() {
     if (!t) return;
     e.preventDefault();
     t.scrollIntoView({ behavior:'smooth', block:'start' });
-    const offset = 80;
-    setTimeout(() => window.scrollBy(0, -offset), 50);
+    setTimeout(() => window.scrollBy(0, -80), 50);
   });
 }
 
@@ -535,9 +588,9 @@ async function postJSON(url, data) {
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-/* ── Expose globals for inline onclick ── */
-window.openModal       = openModal;
+/* ── Expose globals ── */
+window.openModal        = openModal;
 window.filterByCategory = filterByCategory;
 
-/* ── Boot ───────────────────────────────── */
+/* ── Boot ── */
 document.addEventListener('DOMContentLoaded', boot);
