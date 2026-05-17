@@ -12,12 +12,12 @@
 // ═══════════════════════════════════════════════════════════════
 
 // ── CONFIG ─────────────────────────────────────────────────────
-const SHEET_ID        = 'YOUR_GOOGLE_SHEET_ID_HERE';        // ← replace
-const DRIVE_FOLDER_ID = 'YOUR_GOOGLE_DRIVE_FOLDER_ID_HERE'; // ← replace
-const CONTACT_EMAIL   = 'your@email.com';                   // ← replace
+const SHEET_ID        = '171fYYGpfohbdG9GFQB-pqzf1fElITQocCGfG5uCLZiY/edit?gid=0#gid=0';        // ← replace
+const DRIVE_FOLDER_ID = '1TDvn6A-_CF6BwfSPPZTYEx2z-7_-8zpQ'; // ← replace
+const CONTACT_EMAIL   = 'shamim393393@email.com';                   // ← replace
 
-const SHEET_NAME   = 'Apps';
-const PASSWORD_KEY = 'FUSION_ADMIN_PASSWORD';
+const SHEET_NAME   = 'Fusion Apps Database';
+const PASSWORD_KEY = 'Shamim_Fusion';
 
 
 // ── ENTRY POINTS ───────────────────────────────────────────────
